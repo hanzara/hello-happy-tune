@@ -32,19 +32,32 @@ serve(async (req) => {
       throw new Error('Chama not found');
     }
 
-    // Get members data
+    // Get members data with user profiles
     const { data: members, error: membersError } = await supabase
       .from('chama_members')
-      .select(`
-        *,
-        profiles(full_name, email, phone_number)
-      `)
+      .select('*')
       .eq('chama_id', chamaId)
       .eq('is_active', true);
 
     if (membersError) {
       console.error('Error fetching members:', membersError);
     }
+
+    // Fetch profiles separately for each member
+    const membersWithProfiles = await Promise.all(
+      (members || []).map(async (member) => {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, email, phone_number')
+          .eq('user_id', member.user_id)
+          .single();
+        
+        return {
+          ...member,
+          profile: profile || { full_name: 'N/A', email: 'N/A', phone_number: 'N/A' }
+        };
+      })
+    );
 
     // Get contributions data
     const { data: contributions, error: contributionsError } = await supabase
@@ -80,11 +93,11 @@ serve(async (req) => {
             new Date(c.contribution_date).getMonth() === currentMonth
           ) || [];
           
-          members?.forEach(member => {
+          membersWithProfiles?.forEach(member => {
             const memberContributions = monthlyContributions.filter(c => c.member_id === member.id);
             const totalContributed = memberContributions.reduce((sum, c) => sum + c.amount, 0);
             const status = totalContributed >= chama.contribution_amount ? 'Complete' : 'Pending';
-            csvContent += `"${member.profiles?.full_name || 'N/A'}","${member.profiles?.email || 'N/A'}",${totalContributed},"${memberContributions[0]?.contribution_date || 'No contribution'}","${status}"\n`;
+            csvContent += `"${member.profile?.full_name || 'N/A'}","${member.profile?.email || 'N/A'}",${totalContributed},"${memberContributions[0]?.contribution_date || 'No contribution'}","${status}"\n`;
           });
           break;
           
@@ -110,8 +123,8 @@ serve(async (req) => {
           
         case 'member_summary':
           csvContent = 'Member Name,Email,Total Contributed,Last Contribution,Role,Status\n';
-          members?.forEach(member => {
-            csvContent += `"${member.profiles?.full_name || 'N/A'}","${member.profiles?.email || 'N/A'}",${member.total_contributed || 0},"${member.last_contribution_date || 'Never'}","${member.role}","${member.is_active ? 'Active' : 'Inactive'}"\n`;
+          membersWithProfiles?.forEach(member => {
+            csvContent += `"${member.profile?.full_name || 'N/A'}","${member.profile?.email || 'N/A'}",${member.total_contributed || 0},"${member.last_contribution_date || 'Never'}","${member.role}","${member.is_active ? 'Active' : 'Inactive'}"\n`;
           });
           break;
       }
@@ -142,9 +155,9 @@ serve(async (req) => {
           <p>Generated on: ${currentDate}</p>
           
           <h3>Summary</h3>
-          <p>Total Members: ${members?.length || 0}</p>
+          <p>Total Members: ${membersWithProfiles?.length || 0}</p>
           <p>Total Contributions This Month: KES ${monthlyContributions.reduce((sum, c) => sum + c.amount, 0).toLocaleString()}</p>
-          <p>Expected Monthly Collection: KES ${(chama.contribution_amount * (members?.length || 0)).toLocaleString()}</p>
+          <p>Expected Monthly Collection: KES ${(chama.contribution_amount * (membersWithProfiles?.length || 0)).toLocaleString()}</p>
           
           <h3>Member Contributions</h3>
           <table border="1" style="width: 100%; border-collapse: collapse;">
@@ -158,13 +171,13 @@ serve(async (req) => {
               </tr>
             </thead>
             <tbody>
-              ${members?.map(member => {
+              ${membersWithProfiles?.map(member => {
                 const memberContributions = monthlyContributions.filter(c => c.member_id === member.id);
                 const totalContributed = memberContributions.reduce((sum, c) => sum + c.amount, 0);
                 return `
                   <tr>
-                    <td>${member.profiles?.full_name || 'N/A'}</td>
-                    <td>${member.profiles?.email || 'N/A'}</td>
+                    <td>${member.profile?.full_name || 'N/A'}</td>
+                    <td>${member.profile?.email || 'N/A'}</td>
                     <td>KES ${totalContributed.toLocaleString()}</td>
                     <td>${memberContributions[0]?.contribution_date || 'No contribution'}</td>
                     <td>${totalContributed >= chama.contribution_amount ? 'Complete' : 'Pending'}</td>
@@ -259,10 +272,10 @@ serve(async (req) => {
               </tr>
             </thead>
             <tbody>
-              ${members?.map(member => `
+              ${membersWithProfiles?.map(member => `
                 <tr>
-                  <td>${member.profiles?.full_name || 'N/A'}</td>
-                  <td>${member.profiles?.email || 'N/A'}</td>
+                  <td>${member.profile?.full_name || 'N/A'}</td>
+                  <td>${member.profile?.email || 'N/A'}</td>
                   <td>KES ${(member.total_contributed || 0).toLocaleString()}</td>
                   <td>${member.last_contribution_date || 'Never'}</td>
                   <td>${member.role}</td>

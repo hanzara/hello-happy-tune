@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useChamaMembers } from '@/hooks/useChamaMembers';
 import { useWalletOperations, useCentralWallet } from '@/hooks/useWalletOperations';
 import { WalletOperationModal } from './WalletOperationModal';
+import { PersonalSavingsContent } from './PersonalSavingsContent';
 
 interface WalletDashboardProps {
   user: any;
@@ -264,15 +265,7 @@ const WalletDashboard: React.FC<WalletDashboardProps> = ({ user, chamaId, userRo
         </TabsContent>
 
         <TabsContent value="savings" className="space-y-6">
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Personal Savings</CardTitle>
-              <CardDescription>Track your personal savings goals outside of chama</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Personal savings goals feature coming soon</p>
-            </CardContent>
-          </Card>
+          <PersonalSavingsContent />
         </TabsContent>
 
         {isAdminOrTreasurer && (
