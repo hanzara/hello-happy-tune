@@ -8334,7 +8334,7 @@ export type Database = {
       }
       revoke_chama_invitation: {
         Args: { p_invitation_id: string }
-        Returns: boolean
+        Returns: Json
       }
       send_payment: {
         Args: {
